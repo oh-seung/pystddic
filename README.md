@@ -1,0 +1,2 @@
+# pystddic
+Standard Dictionary Management
