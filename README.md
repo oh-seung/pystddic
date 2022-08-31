@@ -151,8 +151,6 @@ stddic.termParser.MultiProcessingInit()
 result = stddic.multiTermParsing(termList, parallel=True)
 ```
 
-    2022-08-31 10:08:53,844	INFO services.py:1456 -- View the Ray dashboard at [1m[32mhttp://127.0.0.1:8265[39m[22m
-    
 
 
 ```python
