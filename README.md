@@ -159,22 +159,3 @@ result = stddic.multiTermParsing(termList, parallel=True)
 # 2) 병렬처리 엔진 Shutdown
 stddic.termParser.MultiProcessingShutdown()
 ```
-
-## 반영(변경)해야할 기능
-> 1) Multi Insert시 전체에 문제가 없을때 반영하기. 단어사전 백업하고 오류 발생하면 복원시키기 <br>
-> 2) 형태소 분석시 Dictionary Sync 변수 만들어, 데이터 반영 횟수 줄이기 <br>
-> 3) Multi 형태소 분석시, 중복되는 단어는 한번만 파싱할 수 있도록 변경 <br>
-> 4) 형태소 분석의 결과에 리스트 형태 전달 또는 결과값(dictionary)에 추가하기
-
-
-## 신규 구현할 기능
-> 1) 비표준 단어 집계 <br>
-
-## 별도 제공할 문서
-> 1) API 구현 <br>
-> 2) 준실시간 데이터 연동
-
-
-```python
-
-```
