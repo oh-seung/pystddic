@@ -12,6 +12,7 @@
  2.2. wordManager
    - 참조사전 다운로드
    - 검증조건 출력 및 변경
+   - 단어 MultiInsert시에 오류난 대상은 출력하고, return을 통해 오류난 행은 다시 전달함
  2.2. termManager
    - 기능정의 필요
  2.3. domainManager
