@@ -9,4 +9,13 @@ setuptools.setup(name='pystddic',
 		python_requires='>=3.8',
 		include_package_data=True,
 		packages = setuptools.find_packages(),
+		install_requires= ['pandas', 
+				   'numpy',
+				   'string',
+				   'copy',
+				   'psutil',
+				   'ray',
+				   'pickle',
+				   'tqdm',
+				  ]
     )
