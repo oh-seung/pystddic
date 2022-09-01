@@ -1,6 +1,6 @@
 import setuptools
 
-setuptools.setup(name='oh-seung',
+setuptools.setup(name='pystddic',
 		version='0.0.1',
 		description='Standard Dictionary Management(Korean Ver)',
 		author='oh seung',
