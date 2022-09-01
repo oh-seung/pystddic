@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(name='pystddic',
-		version='0.0.1',
+		version='0.0.3',
 		description='Standard Dictionary Management(Korean Ver)',
 		author='oh seung',
 		author_email='seung.oh17@gmail.com',
@@ -9,13 +9,10 @@ setuptools.setup(name='pystddic',
 		python_requires='>=3.8',
 		include_package_data=True,
 		packages = setuptools.find_packages(),
-		install_requires= ['pandas', 
-				   'numpy',
-				   'string',
-				   'copy',
-				   'psutil',
-				   'ray',
-				   'pickle',
-				   'tqdm',
+		install_requires= ['pandas>=1.3', 
+				   'numpy>=1.20',
+				   'psutil>=5.8',
+				   'ray>=1.12',
+				   'tqdm>=4.62',
 				  ]
     )
