@@ -5,6 +5,8 @@ from copy import copy
 import psutil
 import ray
 import pickle
+import sys
+import os
 from tqdm.notebook import tqdm
 
 #################################################################################################################
@@ -21,6 +23,9 @@ class wordManage:
         self.wordStorage = pd.DataFrame(None, columns=self.englishColumns)
         
         self.wordVefiryList = {'논리명중복제한':True,
+                                '논리명미존재':True,
+                                '물리명미존재':True,
+                                '물리전체명칭미존재':True,
                                 '물리약어중복제한':True,
                                 '물리약어길이제한':True,
                                 '특수문자사용제한':True,
@@ -32,16 +37,24 @@ class wordManage:
         self.physicalDescriptionCapWord = True ### 물리전체명칭은 첫글자와 공백 기준 첫글자는 대문자로
         self.PhysicalWordLengthLimit = 10
         self.nonUseSpecialword = "(,),%,@,!,~,$,^,&,*,<,;,/,?,-,_,=,+" ### 
+        self.dictionarySync = False
 
     def multiWordInsert(self, records, **kwags):        
         records = tqdm(records) if 'progress' in kwags.keys() else records
+        error_words = []
 
         for row in records:
             synonymousWord = row['synonymousWord'] if 'synonymousWord' in row.keys() else ""
-            self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
-                            LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
-                            EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
-                            wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord)
+            try:
+                self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
+                                LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
+                                EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
+                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord)
+            except:
+                _, message, _ = sys.exc_info()
+                error_words.append([message, row])
+
+        return None if len(error_words) == 0 else error_words
                 
             
     def wordInsert(self, LogicalWord:str, PhysicalWord:str, LogicalDescription:str, PhysicalDescription:str, \
@@ -81,6 +94,8 @@ class wordManage:
             assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
         else:
             self.wordStorage = self.wordStorage.append(tempWordSet, ignore_index=True)
+        
+        self.dictionarySync = False
 
             
     def wordQuery(self, **kwargs):
@@ -96,48 +111,57 @@ class wordManage:
     def _wordInsertValidationCheck(self, tempWordSet):
         """ 표준단어 추가에 대한 정합성 체크"""
         CheckResult = {}
-
-        ### 논리명 중복 체크
-        LogicalWordCheck = self.wordStorage['LogicalWord'] == tempWordSet['LogicalWord']
-        LogicalWordCheck = list(LogicalWordCheck)
-        if self.wordVefiryList['논리명중복제한']:
-            CheckResult['논리명중복발생'] = True if True in LogicalWordCheck else False
-        ### 단어에 특수문자 존재 : (, ), %, @, !, ~, $, ^, &, *, <, ;, /, ?, -, _, =, +
-        ### 단어의 길이가 0 이상일 경우 
-        
-        ### 표준단어에만 해당되는 검증
-        if tempWordSet['wordStandardType'] == '표준단어':
-            PhysicalWordCheck = self.wordStorage['PhysicalWord'] == tempWordSet['PhysicalWord']
-            PhysicalWordCheck = list(PhysicalWordCheck)
-            ### 물리약어 중복 체크
-            if self.wordVefiryList['물리약어중복제한']:
-                CheckResult['물리약어중복발생'] = True if True in PhysicalWordCheck else False        
-            ### 영문약어 길이 체크
-            if self.wordVefiryList['물리약어길이제한']:
-                CheckResult['물리약어길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.PhysicalWordLengthLimit else False
-            ### 엔터티분류어, 속성분류어에 Bool값으로 여부 확인
-        
-        ### 동의어에만 해당하는 체크
-        elif tempWordSet['wordStandardType'] == '동의어':
-            ### 표준단어 칸이 채워져 있는지 확인
-            CheckResult['표준단어공란'] = True if tempWordSet['synonymousWord'] == "" else False
-            ### 표준단어가 존재하는지를 확인
-            _, stadardWordExist = self._synonymusWordModification(tempWordSet)
-            CheckResult['표준단어미존재'] = True if stadardWordExist == False else False
+        if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
+            ### 데이터형식 체크 결과
+            CheckResult['데이터형식불일치'] = False
+            ### 논리명 중복 체크
+            LogicalWordCheck = self.wordStorage['LogicalWord'] == tempWordSet['LogicalWord']
+            LogicalWordCheck = list(LogicalWordCheck)
+            if self.wordVefiryList['논리명중복제한']:
+                CheckResult['논리명중복발생'] = True if True in LogicalWordCheck else False
+            ### 단어에 특수문자 존재 : (, ), %, @, !, ~, $, ^, &, *, <, ;, /, ?, -, _, =, +
+            ### 논리명, 물리명, 물리전체명칭 길이가 0 이상일 경우 
+            CheckResult['논리명미존재'] = True if len(tempWordSet['LogicalWord']) == 0 else False
+            CheckResult['물리명미존재'] = True if len(tempWordSet['PhysicalWord']) == 0 else False
+            CheckResult['물리전체명칭미존재'] = True if len(tempWordSet['PhysicalDescription']) == 0 else False
             
+            ### 표준단어에만 해당되는 검증
+            if tempWordSet['wordStandardType'] == '표준단어':
+                
+                PhysicalWordCheck = self.wordStorage['PhysicalWord'] == tempWordSet['PhysicalWord']
+                PhysicalWordCheck = list(PhysicalWordCheck)
+                ### 물리약어 중복 체크
+                if self.wordVefiryList['물리약어중복제한']:
+                    CheckResult['물리약어중복발생'] = True if True in PhysicalWordCheck else False        
+                ### 영문약어 길이 체크
+                if self.wordVefiryList['물리약어길이제한']:
+                    CheckResult['물리약어길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.PhysicalWordLengthLimit else False
+                ### 엔터티분류어, 속성분류어에 Bool값으로 여부 확인
+            
+            ### 동의어에만 해당하는 체크
+            elif tempWordSet['wordStandardType'] == '동의어':
+                ### 표준단어 칸이 채워져 있는지 확인
+                CheckResult['표준단어공란'] = True if tempWordSet['synonymousWord'] == "" else False
+                ### 표준단어가 존재하는지를 확인
+                _, stadardWordExist = self._synonymusWordModification(tempWordSet)
+                CheckResult['표준단어미존재'] = True if stadardWordExist == False else False
+        else:
+            CheckResult['데이터형식불일치'] = True
+
         return CheckResult
     
     def _wordInsertModification(self, tempWordSet):
         """ 입력된 단어에 대한 정비"""
-        ### 1) 물리약어에 대한 대문자 변환
-        tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].upper() if self.wordVefiryList['물리약어대문자변환'] == True else tempWordSet['PhysicalWord']
-        ### 2) 물리설명에 대해 첫글자, 공백앞 문자 제거
-        tempWordSet['PhysicalDescription'] = capwords(tempWordSet['PhysicalDescription']) if self.wordVefiryList['물리전체명칭첫글자대문자변환'] == True else tempWordSet['PhysicalDescription']
-        ### 2) 논리명, 물리약어, 논리물리설명에 공백 제거
-        tempWordSet['LogicalWord'] = tempWordSet['LogicalWord'].strip()
-        tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].strip()
-        tempWordSet['LogicalDescription'] = tempWordSet['LogicalDescription'].strip()
-        tempWordSet['PhysicalDescription'] = tempWordSet['PhysicalDescription'].strip()        
+        if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
+            ### 1) 물리약어에 대한 대문자 변환
+            tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].upper() if self.wordVefiryList['물리약어대문자변환'] == True else tempWordSet['PhysicalWord']
+            ### 2) 물리설명에 대해 첫글자, 공백앞 문자 제거
+            tempWordSet['PhysicalDescription'] = capwords(tempWordSet['PhysicalDescription']) if self.wordVefiryList['물리전체명칭첫글자대문자변환'] == True else tempWordSet['PhysicalDescription']
+            ### 2) 논리명, 물리약어, 논리물리설명에 공백 제거
+            tempWordSet['LogicalWord'] = tempWordSet['LogicalWord'].strip()
+            tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].strip()
+            tempWordSet['LogicalDescription'] = tempWordSet['LogicalDescription'].strip()
+            tempWordSet['PhysicalDescription'] = tempWordSet['PhysicalDescription'].strip()
         
         return tempWordSet
     
@@ -156,6 +180,11 @@ class wordManage:
             stadardWordExist = True
             
         return tempWordSet, stadardWordExist 
+        
+    def _dictionarySyncStatusChange(self, Status=False):
+        """ 딕셔너리 Sync에 대한 상태를 바꿔줌 """
+        self.dictionarySync = Status
+        
 
 #################################################################################################################
 #################################################################################################################
@@ -383,6 +412,7 @@ class termParse(stdDicMultiProcessing):
                        "attributeClassUseResult":False,
                        "nonstandardWords":"",
                        "synonymousWords":"",
+                       "termOriginalName":"",
                        "termRegistration":False}
         
         for i, (LogicalWord, PhysicalWord, _, _, wordStandardType, synonymousWord) in enumerate(bestParsingResult):
@@ -417,6 +447,7 @@ class termParse(stdDicMultiProcessing):
         termParsingList = self._nonStandardwordCleansing(termParsingList)
         bestParsingResult = self._bestParsingPicking(termParsingList)
         finalResult = self._ParsingResultConcat(bestParsingResult)
+        finalResult["termOriginalName"] = term
         
         return finalResult
     
@@ -434,11 +465,12 @@ class stddic:
         parallel = kwargs['parallel'] if 'parallel' in kwargs.keys() else False
         
         if parallel:
-            results = self.termParser._termParsingMultiProcessing(termList, self.wordManager.wordStorage)
-            
+            results = self.termParser._termParsingMultiProcessing(termList, self.wordManager.wordStorage)            
         else:
+            if self.wordManager.dictionarySync == False:
+                self.termParser._wordStorageSet(self.wordManager.wordStorage)
+                self.wordManager.dictionarySync = True
             results = list()
-            self.termParser._wordStorageSet(self.wordManager.wordStorage)
             for term in termList:
                 result = self.termParser._termParsing(term)
                 results.append(result)
@@ -447,7 +479,10 @@ class stddic:
     
     def termParsing(self, term):
         """ 용어를 단어 기준으로 파싱함 """
-        self.termParser._wordStorageSet(self.wordManager.wordStorage)
+        if self.wordManager.dictionarySync == False:
+            self.termParser._wordStorageSet(self.wordManager.wordStorage)
+            self.wordManager.dictionarySync = True
+
         result = self.termParser._termParsing(term)
         
         return result
@@ -468,3 +503,38 @@ class stddic:
         with open(fullFilePath, 'rb') as fr:
             self.wordManager.wordStorage = pickle.load(fr)
         print('Dictionary Dump file 호출 완료')
+
+    def nonStandardWordExtraction(self, termList):
+        """ 사전에 정의되지 않은 단어를 추출함 """
+        ParsingResult = self.multiTermParsing(termList, parallel=True)
+        ParsingResultDf = pd.DataFrame(ParsingResult)
+        
+        ### 비표준단어 목록 추출(Unique)
+        nonstandardWordList = []
+        for nonstandardWords in ParsingResultDf['nonstandardWords']:
+            nonstandardWords = nonstandardWords[:-1].split(";")
+            if len(nonstandardWords) > 0 and nonstandardWords[0] != '':
+                nonstandardWordList += [word.strip() for word in nonstandardWords]
+        nonstandardWordList = list(set(nonstandardWordList))
+        nonstandardWordList.sort()
+        
+        results = []
+        replaceWords = [':', '(', ')', '[', ']'] ###해당 단어가 포함되어 있으면 치환함, 오류 처리용
+        skipWords = ['.', '?', ''] ### 해당단어는 검색하지 않음
+        
+        ## 해당단어를 포함하고 있는 용어를 찾음
+        for word in nonstandardWordList:
+            cnt = 0
+            if word not in skipWords:
+                orgword = word
+                for replaceWord in replaceWords:
+                    word = word.replace(replaceWord , '\\'+replaceWord)
+                word = "%" + word + "%"
+                useTerms = list(set(ParsingResultDf[ParsingResultDf['logicalParsingResult'].str.contains(word)]['termOriginalName'].tolist()))
+                useTerms = ", ".join(useTerms)
+                if useTerms != '':
+                    results.append([orgword, useTerms, len(useTerms)])
+                    
+        results = pd.DataFrame(results, columns=['비표준단어명', '비표준단어사용용어목록', '사용건수']).sort_values(by=['사용건수'], ascending=False)
+        
+        return results
