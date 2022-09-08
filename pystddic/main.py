@@ -39,9 +39,15 @@ class wordManage:
         self.nonUseSpecialword = "(,),%,@,!,~,$,^,&,*,<,;,/,?,-,_,=,+" ### 
         self.dictionarySync = False
 
-    def multiWordInsert(self, records, **kwags):        
-        records = tqdm(records) if 'progress' in kwags.keys() else records
+    def multiWordInsert(self, records, **kwargs):        
+        records = tqdm(records) if 'progress' in kwargs.keys() else records
         error_words = []
+
+        replace = False
+        if 'replace' in kwargs.keys():
+            if kwargs['replace'] == True:
+                replace = True
+                self.newWordsets = []
 
         for row in records:
             synonymousWord = row['synonymousWord'] if 'synonymousWord' in row.keys() else ""
@@ -49,10 +55,13 @@ class wordManage:
                 self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
                                 LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
                                 EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
-                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord)
+                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord, replace=replace)
             except:
                 _, message, _ = sys.exc_info()
                 error_words.append([message, row])
+                
+        if replace == True:
+            self.wordStorage = pd.DataFrame(self.newWordsets, columns=self.englishColumns)
 
         return None if len(error_words) == 0 else error_words
                 
@@ -83,6 +92,11 @@ class wordManage:
         ### 동의어일 경우, 해당 표준단어에 맞게 조정함
         if tempWordSet['wordStandardType'] == '동의어':
             tempWordSet, _ = self._synonymusWordModification(tempWordSet)
+            
+        ### replace 대상인지 확인(전체를 새로 반영함)
+        replace = False
+        if 'replace' in kwargs.keys():
+            replace = True if kwargs['replace'] == True else False
         
         ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
         CheckResult = self._wordInsertValidationCheck(tempWordSet)
@@ -93,9 +107,28 @@ class wordManage:
                     errorMessage += key + ', '
             assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
         else:
-            self.wordStorage = self.wordStorage.append(tempWordSet, ignore_index=True)
-        
+            if replace == True:
+                self.newWordsets.append(tempWordSet)
+            else:
+                self.wordStorage = self.wordStorage.append(tempWordSet, ignore_index=True)
+
         self.dictionarySync = False
+
+    def wordUpdate(self, LogicalWord:str, **kwargs):
+        """ 단어를 수정, 논리명 기준으로 찾아서 변경 """
+        pass
+        
+    def wordDelete(self, LogicalWord:str, **kwargs):
+        """ 단어를 삭제, 논리명 기준으로 찾아서 변경 """
+        pass
+        
+    def wordVefiryRuleChange(self, **kwargs):
+        """ 단어 검증룰을 변경함
+        """
+        for key in kwargs.keys():
+            if key in self.wordVefiryList.keys():
+                self.wordVefiryList[key] = kwargs[key]
+                print(key, ':', self.wordVefiryList[key], '으로 변경')
 
             
     def wordQuery(self, **kwargs):
