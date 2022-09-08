@@ -3,9 +3,12 @@
  - 형태소 분석의 결과에 리스트 형태 전달 또는 결과값(dictionary)에 추가하기
  - 단어 MultiInsert시에 오류난 대상은 출력하고, return을 통해 오류난 행은 다시 전달
  - 비표준 단어 집계 기능
-   
+ 
 1. 반영(변경)해야할 기능
  - 
+ 
+0.0.5 추가 기능(반영중)
+- MultiInsert시 replace 기능 추가
 
 2. 신규 구현할 기능
  2.1. termParser
@@ -14,7 +17,7 @@
    - 참조사전 다운로드
    - 검증조건 출력 및 변경
    - 데이터 삭제, 변경 기능
-   - MultiInsert시 all_replace 기능 제공(실시간연동시 필요)
+   
  2.2. termManager
    - 기능정의 필요
  2.3. domainManager
