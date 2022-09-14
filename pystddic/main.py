@@ -20,7 +20,7 @@ class wordManage:
         self.koreanColumnMapping = {'LogicalWord':'논리명', 'PhysicalWord':'물리약어', 'LogicalDescription':'단어설명', 'PhysicalDescription':'물리전체명칭',\
                                     'EntityClassWord':'엔터티분류어여부', 'AttributeClassWord':'속성분류어여부', 'wordStandardType':'단어유형코드', 'synonymousWord':'동의어'}
 
-        self.wordStorage = pd.DataFrame(None, columns=self.englishColumns)
+        self._wordStorageEmpty()
         
         self.wordVefiryList = {'논리명중복제한':True,
                                 '논리명미존재':True,
@@ -38,16 +38,25 @@ class wordManage:
         self.PhysicalWordLengthLimit = 10
         self.nonUseSpecialword = "(,),%,@,!,~,$,^,&,*,<,;,/,?,-,_,=,+" ### 
         self.dictionarySync = False
+        
+    def _wordStorageEmpty(self):
+        """ 단어저장소를 생성 또는 비우는 메소드 """
+        self.wordStorage = pd.DataFrame(None, columns=self.englishColumns)
 
     def multiWordInsert(self, records, **kwargs):        
-        records = tqdm(records) if 'progress' in kwargs.keys() else records
+        if 'progress' in kwargs.keys():
+            records = tqdm(records) if kwargs['progress'] else records
+
         error_words = []
 
-        replace = False
+        #### 멀티 Insert시 replace 요청일 경우 기존 단어를 삭제하고 새로 입력한다.
+        #### DB와 실시간 연동시 필요하다, MultiCurrenty 환경을 너무 고민하지 말자. 그건 DB 버전으로 할 경우에 사용
+        #### multiInsert에 대해 type? 을 정의하여 replace(전체변경), merge(데이터병합) 의 유형으로 생성함
+        #### replace : 데이터를 전체 삭제하고 새로 반영
+        #### merge : 중복되는 데이터를 변경함, 단 삭제되지 않음
         if 'replace' in kwargs.keys():
-            if kwargs['replace'] == True:
-                replace = True
-                self.newWordsets = []
+            if kwargs['replace']:
+                self._wordStorageEmpty()
 
         for row in records:
             synonymousWord = row['synonymousWord'] if 'synonymousWord' in row.keys() else ""
@@ -55,14 +64,11 @@ class wordManage:
                 self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
                                 LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
                                 EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
-                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord, replace=replace)
+                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord)
             except:
                 _, message, _ = sys.exc_info()
                 error_words.append([message, row])
                 
-        if replace == True:
-            self.wordStorage = pd.DataFrame(self.newWordsets, columns=self.englishColumns)
-
         return None if len(error_words) == 0 else error_words
                 
             
@@ -92,11 +98,6 @@ class wordManage:
         ### 동의어일 경우, 해당 표준단어에 맞게 조정함
         if tempWordSet['wordStandardType'] == '동의어':
             tempWordSet, _ = self._synonymusWordModification(tempWordSet)
-            
-        ### replace 대상인지 확인(전체를 새로 반영함)
-        replace = False
-        if 'replace' in kwargs.keys():
-            replace = True if kwargs['replace'] == True else False
         
         ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
         CheckResult = self._wordInsertValidationCheck(tempWordSet)
@@ -107,24 +108,28 @@ class wordManage:
                     errorMessage += key + ', '
             assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
         else:
-            if replace == True:
-                self.newWordsets.append(tempWordSet)
-            else:
-                self.wordStorage = self.wordStorage.append(tempWordSet, ignore_index=True)
+            self.wordStorage = self.wordStorage.append(tempWordSet, ignore_index=True)
 
         self.dictionarySync = False
 
-    def wordUpdate(self, LogicalWord:str, **kwargs):
-        """ 단어를 수정, 논리명 기준으로 찾아서 변경 """
-        pass
+    def wordUpdate(self, newWordSet:dict, **kwargs):
+        """ 단어를 변경함, 논리명 기준으로 찾아서 다른값을 변경 """
+        idx = self.wordStorage[self.wordStorage['LogicalWord'] == newWordSet['LogicalWord']].index[0]
+        wordSet = self.wordStorage.loc[idx].to_dict()
+        for k, v in newWordSet.items():
+            wordSet[k] = v
+        self.wordStorage.loc[idx] = wordSet
         
-    def wordDelete(self, LogicalWord:str, **kwargs):
-        """ 단어를 삭제, 논리명 기준으로 찾아서 변경 """
-        pass
+    def wordDelete(self, condition:dict, **kwargs):
+        """ 조건에 맞는 단어를 삭제 """
+        tempWordStorage = self.wordStorage
+        for k, v in condition.items():
+            tempWordStorage = tempWordStorage[tempWordStorage[k] == v]
+        self.wordStorage = self.wordStorage.drop(tempWordStorage.index)
+        self.wordStorage.reset_index(drop=True, inplace=True)
         
     def wordVefiryRuleChange(self, **kwargs):
-        """ 단어 검증룰을 변경함
-        """
+        """ 단어 검증룰을 변경 """
         for key in kwargs.keys():
             if key in self.wordVefiryList.keys():
                 self.wordVefiryList[key] = kwargs[key]
@@ -141,7 +146,7 @@ class wordManage:
         
         return  self.wordStorage
 
-    def _wordInsertValidationCheck(self, tempWordSet):
+    def _wordInsertValidationCheck(self, tempWordSet:dict):
         """ 표준단어 추가에 대한 정합성 체크"""
         CheckResult = {}
         if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
