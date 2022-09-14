@@ -93,14 +93,14 @@ class wordManage:
          'wordStandardType':wordStandardType, 'synonymousWord':synonymousWord}
         
         ### 표준단어 입력에 대한 기초적인 정제
-        tempWordSet = self._wordInsertModification(tempWordSet)
+        tempWordSet = self._wordModification(tempWordSet)
         
         ### 동의어일 경우, 해당 표준단어에 맞게 조정함
         if tempWordSet['wordStandardType'] == '동의어':
             tempWordSet, _ = self._synonymusWordModification(tempWordSet)
         
         ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
-        CheckResult = self._wordInsertValidationCheck(tempWordSet)
+        CheckResult = self._wordValidationCheck(tempWordSet)
         if True in CheckResult.values():
             errorMessage = ""
             for key, values in CheckResult.items():
@@ -113,12 +113,32 @@ class wordManage:
         self.dictionarySync = False
 
     def wordUpdate(self, newWordSet:dict, **kwargs):
-        """ 단어를 변경함, 논리명 기준으로 찾아서 다른값을 변경 """
+        """ 단어를 수정, 논리명 기준으로 찾아서 변경 """
         idx = self.wordStorage[self.wordStorage['LogicalWord'] == newWordSet['LogicalWord']].index[0]
-        wordSet = self.wordStorage.loc[idx].to_dict()
+        tempWordSet = self.wordStorage.loc[idx].to_dict()
         for k, v in newWordSet.items():
-            wordSet[k] = v
-        self.wordStorage.loc[idx] = wordSet
+            tempWordSet[k] = v
+            
+        ### 표준단어 입력에 대한 기초적인 정제
+        tempWordSet = self._wordModification(tempWordSet)
+        
+        ### 동의어일 경우, 해당 표준단어에 맞게 조정함
+        if tempWordSet['wordStandardType'] == '동의어':
+            tempWordSet, _ = self._synonymusWordModification(tempWordSet)
+            
+
+        ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
+        CheckResult = self._wordValidationCheck(tempWordSet, dmlType='UPDATE', newWordSet=newWordSet)
+        if True in CheckResult.values():
+            errorMessage = ""
+            for key, values in CheckResult.items():
+                if values == True:
+                    errorMessage += key + ', '
+            assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
+        else:
+            self.wordStorage.loc[idx] = tempWordSet
+        
+        
         
     def wordDelete(self, condition:dict, **kwargs):
         """ 조건에 맞는 단어를 삭제 """
@@ -129,7 +149,8 @@ class wordManage:
         self.wordStorage.reset_index(drop=True, inplace=True)
         
     def wordVefiryRuleChange(self, **kwargs):
-        """ 단어 검증룰을 변경 """
+        """ 단어 검증룰을 변경함
+        """
         for key in kwargs.keys():
             if key in self.wordVefiryList.keys():
                 self.wordVefiryList[key] = kwargs[key]
@@ -146,7 +167,7 @@ class wordManage:
         
         return  self.wordStorage
 
-    def _wordInsertValidationCheck(self, tempWordSet:dict):
+    def _wordValidationCheck(self, tempWordSet:dict, dmlType:str='INSERT', **kwargs):
         """ 표준단어 추가에 대한 정합성 체크"""
         CheckResult = {}
         if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
@@ -185,10 +206,22 @@ class wordManage:
                 CheckResult['표준단어미존재'] = True if stadardWordExist == False else False
         else:
             CheckResult['데이터형식불일치'] = True
+            
+        try:
+            if dmlType == 'UPDATE':
+                # (1) 논리명 중복을 제거함,
+                del CheckResult['논리명중복발생']
+                # (2) 물리명 중복의 경우, 단어 신청 내용이 없으면 검증하지 않아도 됨
+                newWordSet = kwargs['newWordSet']
+                if 'PhysicalWord' not in newWordSet.keys():
+                    del CheckResult['물리약어중복발생']
+
+        except:
+            pass
 
         return CheckResult
     
-    def _wordInsertModification(self, tempWordSet):
+    def _wordModification(self, tempWordSet):
         """ 입력된 단어에 대한 정비"""
         if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
             ### 1) 물리약어에 대한 대문자 변환
@@ -488,6 +521,56 @@ class termParse(stdDicMultiProcessing):
         finalResult["termOriginalName"] = term
         
         return finalResult
+    
+#################################################################################################################
+#################################################################################################################
+#################################################################################################################
+class termManage:
+    def __init__(self):
+        pass
+    
+    def termInsert(self, LogicalWord:str, LogicalDescription:str, wordStandardType:str, **kwargs):
+        """ 용어를 등록 """
+        pass
+    
+    def termUpdate(self, termSet:dict, **kwargs):
+        """ 용어를 변경 """
+        pass    
+        
+    def _termModification(self, termSet:dict):
+        """ 등록하고자 하는 용어를 표준에 맞게 조정"""
+        pass
+    
+    def _termValidationCheck(self, termSet:dict):
+        """ 용어가 맞는지 검증 """
+        pass
+    
+    
+
+#################################################################################################################
+#################################################################################################################
+#################################################################################################################
+
+class domainManage:
+    def __init__(self):
+        pass
+    
+    def domainInsert(self, LogicalWord:str, LogicalDescription:str, wordStandardType:str, **kwargs):
+        """ 용어를 등록 """
+        pass
+    
+    def domainUpdate(self, domainSet:dict, **kwargs):
+        """ 용어를 변경 """
+        pass    
+        
+    def _domainModification(self, domainSet:dict):
+        """ 등록하고자 하는 용어를 표준에 맞게 조정"""
+        pass
+    
+    def _domainValidationCheck(self, domainSet:dict):
+        """ 용어가 맞는지 검증 """
+        pass
+    
     
 #################################################################################################################
 #################################################################################################################
