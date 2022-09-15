@@ -114,31 +114,37 @@ class wordManage:
 
     def wordUpdate(self, newWordSet:dict, **kwargs):
         """ 단어를 수정, 논리명 기준으로 찾아서 변경 """
-        idx = self.wordStorage[self.wordStorage['LogicalWord'] == newWordSet['LogicalWord']].index[0]
-        tempWordSet = self.wordStorage.loc[idx].to_dict()
-        for k, v in newWordSet.items():
-            tempWordSet[k] = v
-            
-        ### 표준단어 입력에 대한 기초적인 정제
-        tempWordSet = self._wordModification(tempWordSet)
-        
-        ### 동의어일 경우, 해당 표준단어에 맞게 조정함
-        if tempWordSet['wordStandardType'] == '동의어':
-            tempWordSet, _ = self._synonymusWordModification(tempWordSet)
-            
+        try:
+            idx = self.wordStorage[self.wordStorage['LogicalWord'] == newWordSet['LogicalWord']].index[0]
+            tempWordSet = self.wordStorage.loc[idx].to_dict()
+            for k, v in newWordSet.items():
+                tempWordSet[k] = v        
 
-        ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
-        CheckResult = self._wordValidationCheck(tempWordSet, dmlType='UPDATE', newWordSet=newWordSet)
-        if True in CheckResult.values():
-            errorMessage = ""
-            for key, values in CheckResult.items():
-                if values == True:
-                    errorMessage += key + ', '
-            assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
-        else:
-            self.wordStorage.loc[idx] = tempWordSet
-        
-        
+            ### 표준단어 입력에 대한 기초적인 정제
+            tempWordSet = self._wordModification(tempWordSet)
+
+            ### 동의어일 경우, 해당 표준단어에 맞게 조정함
+            if tempWordSet['wordStandardType'] == '동의어':
+                tempWordSet, _ = self._synonymusWordModification(tempWordSet)
+
+            ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
+            CheckResult = self._wordValidationCheck(tempWordSet, dmlType='UPDATE', newWordSet=newWordSet)
+            if True in CheckResult.values():
+                errorMessage = ""
+                for key, values in CheckResult.items():
+                    if values == True:
+                        errorMessage += key + ', '
+                assert False, 'An error occurred in the word registration. \n LogicalWord:{0}, ErrorMessage:{1}'.format(tempWordSet['LogicalWord'], errorMessage[:-2])
+            else:
+                print('word change complete.')
+                print(tempWordSet)
+                self.wordStorage.loc[idx] = tempWordSet
+        except IndexError as e:
+            assert False, 'There is no word with matching logical name, {0}'.format(e)
+            
+        except:
+            _, message, _ = sys.exc_info()
+            assert False, 'undefined error, {0}'.format(message)
         
     def wordDelete(self, condition:dict, **kwargs):
         """ 조건에 맞는 단어를 삭제 """
@@ -147,6 +153,8 @@ class wordManage:
             tempWordStorage = tempWordStorage[tempWordStorage[k] == v]
         self.wordStorage = self.wordStorage.drop(tempWordStorage.index)
         self.wordStorage.reset_index(drop=True, inplace=True)
+        
+        print('deleted word:', ", ".join(tempWordStorage['LogicalWord'].tolist()))
         
     def wordVefiryRuleChange(self, **kwargs):
         """ 단어 검증룰을 변경함
