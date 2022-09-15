@@ -389,52 +389,49 @@ class termParse(stdDicMultiProcessing):
         for i in range(len(term)):
             MatchList = termWordList[termWordList[:, 2] == i]
             if i == 0:
-                #표준단어나 임시단어가 존재할 경우, 비표준단어 시작은 제거
-                if (MatchList[:, 4] == '표준단어').tolist().count(True) > 0 or (MatchList[:, 4] == '임시단어').tolist().count(True) > 0:
+                #표준단어나 동의어가 존재할 경우, 비표준단어로 시작은 삭제함 (단어의 경우의 수를 줄이기 위함
+                if '표준단어' in MatchList[:, 4] or '동의어' in MatchList[:, 4]:
                     MatchList = MatchList[MatchList[:, 4] != '비표준']
                 for MatchRow in MatchList:
                     termParsingList.append(MatchRow)                    
-            elif i > 0:
+            else:
                 NewParsingList = list()
-                for i, ParsingCol in enumerate(termParsingList):
-                    for j, MatchRow in enumerate(MatchList):
+                for ParsingCol in termParsingList:
+                    matching = False
+                    for MatchRow in MatchList:
                         if ParsingCol[-3] == MatchRow[2]:
+                            matching = True
                             NParsingCol = np.append(ParsingCol, MatchRow)
                             NewParsingList.append(NParsingCol)
-                        else:
-                            NewParsingList.append(ParsingCol)
-
-                termParsingList = copy(NewParsingList)
+                    if not matching:
+                        NewParsingList.append(ParsingCol)
+                termParsingList = NewParsingList
         return termParsingList
         
-    def _nonStandardwordCleansing(self, termParsingList):
+    def _nonStandardwordCleansing(self, termParsing):
         """비표준 단어에 대한 연결된 결과를 만듬 """
-        newTermParsingList = []
-        for ParsingPatterm in termParsingList:
-            ### 비표준단어를 서로 연결하는 로직
-            ParsingPatterm = ParsingPatterm.reshape(-1, 6)
-            NonParsWord = ""
-            ParsingResult = []
-            bef_e = 0
-            for word, phwd, s, e, gb, stdwd in ParsingPatterm:
-                if gb != '비표준':
-                    ParsingResult.append([word, phwd, s, e, gb, stdwd])
-                else:
-                    if s > bef_e or s == 0:
-                        NonParsWord = word
-                        NonParsresult = [word, '', s, e, gb, stdwd]
+        ParsingPatterm = termParsing.reshape(-1, 6)
+        NonParsWord = ""
+        ParsingResult = []
+        bef_e = 0
+        for word, phwd, s, e, gb, stdwd in ParsingPatterm:
+            if gb != '비표준':
+                ParsingResult.append([word, phwd, s, e, gb, stdwd])
+            else:
+                if s > bef_e or s == 0:
+                    NonParsWord = word
+                    NonParsresult = [word, '', s, e, gb, stdwd]
 
-                    elif s == bef_e:
-                        NonParsresult = copy(ParsingResult[-1])
-                        s, e = NonParsresult[2], NonParsresult[3]+1
-                        del ParsingResult[-1]
-                        NonParsWord = NonParsWord + word
-                        NonParsresult = [NonParsWord, '', s, e, gb, NonParsWord]
+                elif s == bef_e:
+                    NonParsresult = copy(ParsingResult[-1])
+                    s, e = NonParsresult[2], NonParsresult[3]+1
+                    del ParsingResult[-1]
+                    NonParsWord = NonParsWord + word
+                    NonParsresult = [NonParsWord, '', s, e, gb, NonParsWord]
 
-                    ParsingResult.append(NonParsresult)
-                    bef_e = copy(e)
-            newTermParsingList.append(np.array(ParsingResult))
-        return newTermParsingList
+                ParsingResult.append(NonParsresult)
+                bef_e = copy(e)
+        return ParsingResult
     
         return termParsingList
     
@@ -442,35 +439,35 @@ class termParse(stdDicMultiProcessing):
         """ 가장 좋은 단어의 구성을 찾음 """
         attrclsword = self.wordStorage[self.wordStorage['AttributeClassWord']]['LogicalWord'].tolist()
         
-        NewParsingList = []
+        summaryResult = []
         for i, ParsingData in enumerate(termParsingList):
-            ParsingDataSummary = {'행번호':0, '속성분류어사용여부':'N', '표준단어':0, '동의어':0, '비표준':0, '비표준길이합':0, '임시동의어':0, '임시단어':0}
+            ParsingData = ParsingData.reshape(-1, 6)
+            ParsingDataSummary = {'행번호':0, '속성분류어길이':99, '표준단어':0, '동의어':0, '비표준':0, '비표준길이합':0, '임시동의어':0, '임시단어':0}
             ParsingDataSummary['비표준길이합'] = sum([len(word) for word in ParsingData[ParsingData[:, 4] == '비표준'][:, 0]])
-            
-            k, v = np.unique(ParsingData[:, 4], return_counts=True)
-            
-            for j, key in enumerate(k):
-                ParsingDataSummary[key] = v[j]
 
-            ParsingDataSummary['속성분류어사용여부'] = 'Y' if ParsingData[-1][0] in attrclsword else 'N'
+            ks, vs = np.unique(ParsingData[:, 4], return_counts=True)
+            for k, v in zip(ks, vs):
+                ParsingDataSummary[k] = v
+
+            #ParsingDataSummary['속성분류어사용여부'] = 'Y' if ParsingData[-1][0] in attrclsword else 'N'
+            ParsingDataSummary['속성분류어길이'] = len(ParsingData[-1][0]) if ParsingData[-1][0] in attrclsword else 99
 
             ParsingDataSummary['행번호'] = i
-            NewParsingList.append(ParsingDataSummary)
+            summaryResult.append(ParsingDataSummary)
 
-        df = pd.DataFrame(NewParsingList).fillna(0)
+        df = pd.DataFrame(summaryResult).fillna(0)
         df['표준동의어합'] = df['동의어'] + df['표준단어']
         
         ## 형태소분석 조건중 우선 순위 지정
-        #### 1) 속성분류어 사용
-        #### 2) 비표준 단어의 길이가 적어야 한다.
-        #### 3) 표준단어와 동의어 사용 갯수가 적어야 한다.
-        #### 4) 동의어 사용 횟수가 적어야 한다.
+        #### 1) 비표준 단어의 길이가 적어야 한다.
+        #### 2) 표준단어와 동의어 단어의 사용 개수가 적어야 한다.
+        #### 3) 단어 사용개수가 동률일경우, 동의어 사용개수가 적어야 한다
+        #### 4) 속성분류어의 길이가 적은 것을 권장한다 (명과 장명, 수와 점수)
 
-        df = df.sort_values(by=['속성분류어사용여부', '비표준길이합','표준동의어합', '동의어'], ascending=[False, True, True, True])
+        #df = df.sort_values(by=['속성분류어사용여부', '비표준길이합','표준동의어합', '동의어'], ascending=[False, True, True, True])
+        df = df.sort_values(by=['비표준길이합', '표준동의어합', '동의어', '속성분류어길이'], ascending=[True, True, True, True])
         idx = df.head(1).reset_index()['index'][0]
-        bestParsingResult = termParsingList[idx]
-        bestParsingResult = bestParsingResult.reshape(-1, 6).tolist()
-        return bestParsingResult
+        return termParsingList[idx]
     
     def _ParsingResultConcat(self, bestParsingResult):
         """ 가장 좋은단어의 구성을 결과로 연결하고, 요약함 """
@@ -484,8 +481,10 @@ class termParse(stdDicMultiProcessing):
                        "nonstandardWords":"",
                        "synonymousWords":"",
                        "termOriginalName":"",
-                       "termRegistration":False}
-        
+                       "termRegisterValidationCheck":False,
+                       "termRegistration":False,
+                      }
+
         for i, (LogicalWord, PhysicalWord, _, _, wordStandardType, synonymousWord) in enumerate(bestParsingResult):
             finalResult['termSplitResult'] += LogicalWord + ';'
             
@@ -508,6 +507,9 @@ class termParse(stdDicMultiProcessing):
                 
         finalResult["attributeClassWord"], finalResult["attributeClassUseResult"] = self._attributeClassCheck(bestParsingResult)
         
+        ### 용어 등록 가능 여부
+        finalResult['termRegisterValidationCheck'] = True if len(finalResult['nonstandardWords']) == 0 and len(finalResult['synonymousWords']) == 0 else False    
+
         return finalResult
     
     def _termParsing(self, term):
@@ -515,10 +517,10 @@ class termParse(stdDicMultiProcessing):
         term, numericWord = self._numericSplit(term)
         termWordList = self._wordListCreation(term)
         termParsingList = self._termCartessianProduct(term, termWordList)
-        termParsingList = self._nonStandardwordCleansing(termParsingList)
         bestParsingResult = self._bestParsingPicking(termParsingList)
+        bestParsingResult = self._nonStandardwordCleansing(bestParsingResult)
         finalResult = self._ParsingResultConcat(bestParsingResult)
-        finalResult["termOriginalName"] = term
+        finalResult["termOriginalName"] = term + numericWord
         
         return finalResult
     
