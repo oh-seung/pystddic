@@ -99,19 +99,6 @@ stddic.wordManager.wordQuery()
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -187,14 +174,6 @@ stddic.wordManager.wordInsert(LogicalWord='등록차량', PhysicalWord='RGCAR', 
 # multi Insert 
 stddic.wordManager.multiWordInsert(df.to_dict('records'), progress=True, replace=True) #, 
 ```
-
-
-      0%|          | 0/5096 [00:00<?, ?it/s]
-
-
-
-
-
     [[AssertionError('An error occurred in the word registration. \n LogicalWord:비율, ErrorMessage:물리약어중복발생'),
       {'LogicalWord': '비율',
        'PhysicalWord': 'RT',
@@ -223,19 +202,6 @@ stddic.wordManager.wordQuery().head(5)
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
