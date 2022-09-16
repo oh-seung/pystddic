@@ -142,7 +142,7 @@ import pyodbc
 import pandas as pd
 
 ConnString = 'Driver={driver};SERVER={server};PORT={port};DB={dbname};UID={uid};PWD={pwd};'\
-    .format(driver='{Tibero 6 ODBC Driver}', server='10.7.141.84', port='1521', dbname='DATAWARE', uid='dtwareadm', pwd='Encore##5868')
+    .format(driver='{Tibero 6 ODBC Driver}', server='127.0.0.1', port='1521', dbname='pystddic', uid='pystddic', pwd='pystddic')
 dbconn = pyodbc.connect(ConnString, timeout=5)
 
 sql = """SELECT DIC_LOG_NM AS "LogicalWord"
