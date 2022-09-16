@@ -31,10 +31,12 @@ class wordManage:
                                 '특수문자사용제한':True,
                                 '물리약어대문자변환':True,
                                 '물리전체명칭첫글자대문자변환':True,
+                                '물리약어최대길이수':10,
+                                '사용제한특수문자':"(,),%,@,!,~,$,^,&,*,<,>,;,/,?,-,_,=,+,.',\",[,]",
                               }
-        
-        self.physicalWordUpperCase = True ### 영문약어는 대문자로만 사용
-        self.physicalDescriptionCapWord = True ### 물리전체명칭은 첫글자와 공백 기준 첫글자는 대문자로
+                
+        #self.physicalWordUpperCase = True ### 물리약어는 대문자로만 사용
+        #self.physicalDescriptionCapWord = True ### 물리전체명칭은 첫글자와 공백 기준 첫글자는 대문자로
         self.PhysicalWordLengthLimit = 10
         self.nonUseSpecialword = "(,),%,@,!,~,$,^,&,*,<,;,/,?,-,_,=,+" ### 
         self.dictionarySync = False
@@ -76,7 +78,7 @@ class wordManage:
                    EntityClassWord:bool, AttributeClassWord:bool, wordStandardType:str, **kwargs):
         """ 표준단어를 추가함 
              - LogicalWord : 논리단어
-             - PhysicalWord : 물리명칭(영문약어) 용어사용시 해당 단어를 조합
+             - PhysicalWord : 물리명칭(물리약어) 용어사용시 해당 단어를 조합
              - LogicalDescription : 논리단어에 대한 설명
              - PhysicalDescription : 약어가 아닌 영문 전체 명칭을 정의
              - EntityClassWord : 엔터티 분류어 여부
@@ -186,7 +188,11 @@ class wordManage:
             LogicalWordCheck = list(LogicalWordCheck)
             if self.wordVefiryList['논리명중복제한']:
                 CheckResult['논리명중복발생'] = True if True in LogicalWordCheck else False
-            ### 단어에 특수문자 존재 : (, ), %, @, !, ~, $, ^, &, *, <, ;, /, ?, -, _, =, +
+
+            ### 단어에 특수문자 존재
+            specialwords = set(self.wordVefiryList['사용제한특수문자'].split(",")) & set(list(tempWordSet['LogicalWord']))
+            CheckResult['특수문자존재'] = True if len(specialwords) > 0 else False
+
             ### 논리명, 물리명, 물리전체명칭 길이가 0 이상일 경우 
             CheckResult['논리명미존재'] = True if len(tempWordSet['LogicalWord']) == 0 else False
             CheckResult['물리명미존재'] = True if len(tempWordSet['PhysicalWord']) == 0 else False
@@ -200,9 +206,9 @@ class wordManage:
                 ### 물리약어 중복 체크
                 if self.wordVefiryList['물리약어중복제한']:
                     CheckResult['물리약어중복발생'] = True if True in PhysicalWordCheck else False        
-                ### 영문약어 길이 체크
+                ### 물리약어 길이 체크
                 if self.wordVefiryList['물리약어길이제한']:
-                    CheckResult['물리약어길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.PhysicalWordLengthLimit else False
+                    CheckResult['물리약어길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.wordVefiryList['물리약어최대길이수'] else False
                 ### 엔터티분류어, 속성분류어에 Bool값으로 여부 확인
             
             ### 동의어에만 해당하는 체크
@@ -323,6 +329,9 @@ class stdDicMultiProcessing:
 
 class termParse(stdDicMultiProcessing):
     """ 단어사전을 활용하여 용어에 대한 형태소 분석 """    
+    def __init__(self):
+        self.termParseVefiryList = {'물리약어연결문자': '_',
+                              }        
         
     def _wordStorageSet(self, wordStorage):
         """ 용어 형태소분석을 위한 단어사전을 지정 """
@@ -478,6 +487,8 @@ class termParse(stdDicMultiProcessing):
         return termParsingList[idx]
     
     def _ParsingResultConcat(self, bestParsingResult):
+        physicalWordConcatChar = self.termParseVefiryList['물리약어연결문자']
+        
         """ 가장 좋은단어의 구성을 결과로 연결하고, 요약함 """
         logicalTermParsingResult, physicalTermParsingResult = "", ""
         
@@ -509,9 +520,9 @@ class termParse(stdDicMultiProcessing):
                 finalResult['nonstandardWords'] += LogicalWord + ";"                
                 
             if wordStandardType == '표준단어' or wordStandardType == '동의어':
-                finalResult['physicalName'] += PhysicalWord if i == 0 else '_' + PhysicalWord
+                finalResult['physicalName'] += PhysicalWord if i == 0 else physicalWordConcatChar + PhysicalWord
             else:
-                finalResult['physicalName'] += '%' + LogicalWord + '%' if i == 0 else '_%' + LogicalWord + '%'
+                finalResult['physicalName'] += '%' + LogicalWord + '%' if i == 0 else physicalWordConcatChar + '%' + LogicalWord + '%'
                 
         finalResult["attributeClassWord"], finalResult["attributeClassUseResult"] = self._attributeClassCheck(bestParsingResult)
         
