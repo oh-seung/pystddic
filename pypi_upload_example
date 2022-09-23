@@ -1,0 +1,5 @@
+참고url : https://devocean.sk.com/blog/techBoardDetail.do?ID=163566
+
+1. setup.py 에서 버전 확인
+2. python -m build
+3. python -m twine upload dist/*
