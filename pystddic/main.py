@@ -17,7 +17,7 @@ class wordManage:
     def __init__(self):
         self.englishColumns = ['LogicalWord', 'PhysicalWord', 'LogicalDescription', 'PhysicalDescription', \
                                'EntityClassWord', 'AttributeClassWord', 'wordStandardType', 'synonymousWord']
-        self.koreanColumnMapping = {'LogicalWord':'논리명', 'PhysicalWord':'물리약어', 'LogicalDescription':'단어설명', 'PhysicalDescription':'물리전체명칭',\
+        self.koreanColumnMapping = {'LogicalWord':'논리명', 'PhysicalWord':'물리명', 'LogicalDescription':'단어설명', 'PhysicalDescription':'물리전체명칭',\
                                     'EntityClassWord':'엔터티분류어여부', 'AttributeClassWord':'속성분류어여부', 'wordStandardType':'단어유형코드', 'synonymousWord':'동의어'}
 
         self._wordStorageEmpty()
@@ -26,16 +26,16 @@ class wordManage:
                                 '논리명미존재':True,
                                 '물리명미존재':True,
                                 '물리전체명칭미존재':True,
-                                '물리약어중복제한':True,
-                                '물리약어길이제한':True,
+                                '물리명중복제한':True,
+                                '물리명길이제한':True,
                                 '특수문자사용제한':True,
-                                '물리약어대문자변환':True,
+                                '물리명대문자변환':True,
                                 '물리전체명칭첫글자대문자변환':True,
-                                '물리약어최대길이수':10,
+                                '물리명최대길이수':10,
                                 '사용제한특수문자':"(,),%,@,!,~,$,^,&,*,<,>,;,/,?,-,_,=,+,.',\",[,]",
                               }
                 
-        #self.physicalWordUpperCase = True ### 물리약어는 대문자로만 사용
+        #self.physicalWordUpperCase = True ### 물리명는 대문자로만 사용
         #self.physicalDescriptionCapWord = True ### 물리전체명칭은 첫글자와 공백 기준 첫글자는 대문자로
         self.PhysicalWordLengthLimit = 10
         self.nonUseSpecialword = "(,),%,@,!,~,$,^,&,*,<,;,/,?,-,_,=,+" ### 
@@ -78,7 +78,7 @@ class wordManage:
                    EntityClassWord:bool, AttributeClassWord:bool, wordStandardType:str, **kwargs):
         """ 표준단어를 추가함 
              - LogicalWord : 논리단어
-             - PhysicalWord : 물리명칭(물리약어) 용어사용시 해당 단어를 조합
+             - PhysicalWord : 물리명 용어사용시 해당 단어를 조합
              - LogicalDescription : 논리단어에 대한 설명
              - PhysicalDescription : 약어가 아닌 영문 전체 명칭을 정의
              - EntityClassWord : 엔터티 분류어 여부
@@ -203,12 +203,12 @@ class wordManage:
                 
                 PhysicalWordCheck = self.wordStorage['PhysicalWord'] == tempWordSet['PhysicalWord']
                 PhysicalWordCheck = list(PhysicalWordCheck)
-                ### 물리약어 중복 체크
-                if self.wordVefiryList['물리약어중복제한']:
-                    CheckResult['물리약어중복발생'] = True if True in PhysicalWordCheck else False        
-                ### 물리약어 길이 체크
-                if self.wordVefiryList['물리약어길이제한']:
-                    CheckResult['물리약어길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.wordVefiryList['물리약어최대길이수'] else False
+                ### 물리명 중복 체크
+                if self.wordVefiryList['물리명중복제한']:
+                    CheckResult['물리명중복발생'] = True if True in PhysicalWordCheck else False        
+                ### 물리명 길이 체크
+                if self.wordVefiryList['물리명길이제한']:
+                    CheckResult['물리명길이제한초과'] = True if len(tempWordSet['PhysicalWord']) > self.wordVefiryList['물리명최대길이수'] else False
                 ### 엔터티분류어, 속성분류어에 Bool값으로 여부 확인
             
             ### 동의어에만 해당하는 체크
@@ -228,7 +228,7 @@ class wordManage:
                 # (2) 물리명 중복의 경우, 단어 신청 내용이 없으면 검증하지 않아도 됨
                 newWordSet = kwargs['newWordSet']
                 if 'PhysicalWord' not in newWordSet.keys():
-                    del CheckResult['물리약어중복발생']
+                    del CheckResult['물리명중복발생']
 
         except:
             pass
@@ -238,11 +238,11 @@ class wordManage:
     def _wordModification(self, tempWordSet):
         """ 입력된 단어에 대한 정비"""
         if [type(val).__name__ for val in tempWordSet.values()] == ['str', 'str', 'str', 'str', 'bool', 'bool', 'str', 'str']:
-            ### 1) 물리약어에 대한 대문자 변환
-            tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].upper() if self.wordVefiryList['물리약어대문자변환'] == True else tempWordSet['PhysicalWord']
+            ### 1) 물리명에 대한 대문자 변환
+            tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].upper() if self.wordVefiryList['물리명대문자변환'] == True else tempWordSet['PhysicalWord']
             ### 2) 물리설명에 대해 첫글자, 공백앞 문자 제거
             tempWordSet['PhysicalDescription'] = capwords(tempWordSet['PhysicalDescription']) if self.wordVefiryList['물리전체명칭첫글자대문자변환'] == True else tempWordSet['PhysicalDescription']
-            ### 2) 논리명, 물리약어, 논리물리설명에 공백 제거
+            ### 2) 논리명, 물리명, 논리물리설명에 공백 제거
             tempWordSet['LogicalWord'] = tempWordSet['LogicalWord'].strip()
             tempWordSet['PhysicalWord'] = tempWordSet['PhysicalWord'].strip()
             tempWordSet['LogicalDescription'] = tempWordSet['LogicalDescription'].strip()
@@ -251,7 +251,7 @@ class wordManage:
         return tempWordSet
     
     def _synonymusWordModification(self, tempWordSet):
-        """ 입력된 단어가 동의어일 경우 물리약어 및 설명, 엔터티분류어, 속성분류어 등을 표준단어와 같도록 조정"""
+        """ 입력된 단어가 동의어일 경우 물리명 및 설명, 엔터티분류어, 속성분류어 등을 표준단어와 같도록 조정"""
         condition = (self.wordStorage['LogicalWord'] == tempWordSet['synonymousWord']) & (self.wordStorage['wordStandardType'] == '표준단어')
         condition = list(condition)
         stadardWordExist = False
@@ -330,7 +330,7 @@ class stdDicMultiProcessing:
 class termParse(stdDicMultiProcessing):
     """ 단어사전을 활용하여 용어에 대한 형태소 분석 """    
     def __init__(self):
-        self.termParseVefiryList = {'물리약어연결문자': '_',
+        self.termParseVefiryList = {'물리명연결문자': '_',
                               }        
         
     def _wordStorageSet(self, wordStorage):
@@ -395,7 +395,7 @@ class termParse(stdDicMultiProcessing):
                         termWordList.append([word, "", i, i+ len(word), '비표준', word])
                             
                         
-        termWordList = pd.DataFrame(termWordList, columns=['논리명', '물리약어', '시작위치', '종료위치', '단어유형', '표준단어'])
+        termWordList = pd.DataFrame(termWordList, columns=['논리명', '물리명', '시작위치', '종료위치', '단어유형', '표준단어'])
         termWordList = termWordList.drop_duplicates().sort_values(['시작위치', '종료위치']).to_numpy()
         return termWordList
     
@@ -487,7 +487,7 @@ class termParse(stdDicMultiProcessing):
         return termParsingList[idx]
     
     def _ParsingResultConcat(self, bestParsingResult):
-        physicalWordConcatChar = self.termParseVefiryList['물리약어연결문자']
+        physicalWordConcatChar = self.termParseVefiryList['물리명연결문자']
         
         """ 가장 좋은단어의 구성을 결과로 연결하고, 요약함 """
         logicalTermParsingResult, physicalTermParsingResult = "", ""
