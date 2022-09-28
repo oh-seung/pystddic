@@ -572,25 +572,124 @@ class termManage:
 #################################################################################################################
 #################################################################################################################
 
-class domainManage:
+class domainGroupManage:
+    """ 도메인 그룹 관리 """
     def __init__(self):
+        self.domainGroupColumns = ['domainGroupName', 'domainGroupDescription', 'domainGroupUniqueness', 'domainAttributeClassWord']
+        self.domainGroupKoreanMapping = {'domainGroupName':'도메인그룹명', 
+                                         'domainGroupDescription':'도메인그룹설명',
+                                         'domainGroupUniquenessRule':'도메인그룹유일성규칙',
+                                         'domainAttributeClassWord':'도메인그룹사용속성분류어',
+                                         }
+        self.domainGroupUniquessList = ['제한', '번호']
+
+    def _domainGroupStorageEmpty(self):
+        """ 도메인그룹 저장 DataFrame 생성(비우기) """
+        self.domainGroupStorage = pd.DataFrame(None, columns=self.domainGroupColumns)
+
+    def domainGroupInsert(self, domainGroupName:str, domainGroupDescription:str, domainGroupUniqueness:str, domainAttributeClassWord:list, **kwargs):
+        tempDomainGroupSet = {'domainGroupName':domainGroupName, 'domainGroupDescription':domainGroupDescription, 'domainGroupUniqueness':domainGroupUniqueness, 'domainAttributeClassWord':domainAttributeClassWord}
+        ### 체크결과에 오류(True)가 있을때는 오류를 발생시키고, 오류가 없을 경우 데이터 프레임에 입력
+        CheckResult = self._domainGroupValidationCheck(tempDomainGroupSet)
+        if True in CheckResult.values():
+            errorMessage = ""
+            for key, values in CheckResult.items():
+                if values == True:
+                    errorMessage += key + ', '
+            assert False, 'An error occurred in the domain group registration. \n domainGroupName:{0}, ErrorMessage:{1}'.format(tempDomainGroupSet['domainGroupName'], errorMessage[:-2])
+        else:
+            self.domainGroupStorage = self.domainGroupStorage.append(tempDomainGroupSet, ignore_index=True)
+        
+        
+    def _domainGroupModification(self, domainGroupSet:dict):
+        """ 등록하고자 하는 도메인그룹을 규칙에 맞게 조정"""
         pass
     
-    def domainInsert(self, LogicalWord:str, LogicalDescription:str, wordStandardType:str, **kwargs):
-        """ 용어를 등록 """
+    def _domainGroupValidationCheck(self, domainGroupSet:dict):
+        """ 도메인이 맞는지 검증 """
+        checkResult = dict()
+        
+        checkResult['도메인그룹명 중복'] = domainGroupSet['domainGroupName'] in self.domainGroupStorage['domainGroupName'].values
+        checkResult['도메인그룹 설명 미작성'] = len(domainGroupSet['domainGroupDescription'].strip()) == 0
+        checkResult['도메인그룹 유일성 기준값 없음(제한 또는 번호 사용)'] = domainGroupSet['domainGroupUniqueness'] not in self.domainGroupUniquessList
+        checkResult['도메인그룹 사용 속성분류어 미작성'] = len(domainGroupSet['domainAttributeClassWord']) == 0
+       
+        return checkResult
+
+    def domainGroupUpdate(self, **kwargs):
+        """ """
         pass
+
+    def domainGroupDelete(self, **kwargs):
+        """ """
+        pass
+
+class domainManage(domainGroupManage):
+    def __init__(self):
+        super().__init__()
+        self.domainColumns = ['domainName', 'domainDescription', 'domainDataType', 'domainLength', 'domainScale', 'domainGroupName', 'minValue', 'maxValue', 'validValue', 'default']
+        self.domainKoreanMapping = {}
+
+        self.domainDataTypeList = ['varchar', 'char', 'int', 'float', 'clob', 'blob', 'nvarchar', 'nchar', 'date', 'datetime', 'timestamp', 'datestr']
+
+        self._domainGroupStorageEmpty()
+        self._domainStorageEmpty()
+
+    def _domainStorageEmpty(self):
+        """ 도메인 저장 DataFrame 생성(비우기) """
+        self.domainStorage = pd.DataFrame(None, columns=self.domainColumns)        
+
+    def domainInsert(self, domainName:str, domainDescription:str, domainDataType:str, domainGroupName:str, **kwargs):
+        """ 도메인 등록 """
+        tempDomainSet = {'domainName':domainName,
+            'domainDescription':domainDescription,
+            'domainDataType':domainDataType,
+            'domainLength':None,
+            'domainScale':None,
+            'domainGroupName':domainGroupName,
+            'minValue':None,
+            'maxValue':None,
+            'validValue':None,
+            'default':None,
+        }
+        
+        #tempDomainSet[''] = kwargs[''] if '' in kwargs.keys() else ''
+        tempDomainSet['domainLength'] = kwargs['domainLength'] if 'domainLength' in kwargs.keys() else ''
+        tempDomainSet['domainScale'] = kwargs['domainScale'] if 'domainScale' in kwargs.keys() else ''
+        tempDomainSet['minValue'] = kwargs['minValue'] if 'minValue' in kwargs.keys() else ''
+        tempDomainSet['maxValue'] = kwargs['maxValue'] if 'maxValue' in kwargs.keys() else ''
+        tempDomainSet['validValue'] = kwargs['validValue'] if 'validValue' in kwargs.keys() else ''
+        tempDomainSet['default'] = kwargs['default'] if 'default' in kwargs.keys() else ''
+
+        checkResult = self._domainValidationCheck(tempDomainSet)
+        if True in checkResult.values():
+            errorMessage = ""
+            for key, values in checkResult.items():
+                if values == True:
+                    errorMessage += key + ', '
+            assert False, 'An error occurred in the domain registration. \n domainGroupName:{0}, ErrorMessage:{1}'.format(tempDomainSet['domainName'], errorMessage[:-2])
+        else:
+            self.domainStorage = self.domainStorage.append(tempDomainSet, ignore_index=True)
+
     
     def domainUpdate(self, domainSet:dict, **kwargs):
-        """ 용어를 변경 """
+        """ 도메인 변경 """
         pass    
         
     def _domainModification(self, domainSet:dict):
-        """ 등록하고자 하는 용어를 표준에 맞게 조정"""
+        """ 등록하고자 하는 도메인을 규칙에 맞게 조정"""
         pass
     
     def _domainValidationCheck(self, domainSet:dict):
-        """ 용어가 맞는지 검증 """
-        pass
+        """ 도메인이 맞는지 검증 """
+        checkResult = {}
+
+        ### 소수점 길이 체크
+        if type(domainSet['domainLength']).__name__ == 'int' and type(domainSet['domainScale']).__name__ == 'int':
+            checkResult['소수점길이, 데이터길이 초과'] = domainSet['domainLength'] > 0 and domainSet['domainScale'] > 0 and domainSet['domainScale'] >= domainSet['domainLength']
+
+        return checkResult
+
     
     
 #################################################################################################################
@@ -601,6 +700,7 @@ class stddic:
     def __init__(self):
         self.wordManager = wordManage()
         self.termParser = termParse()
+        self.domainManager = domainManage()
             
     def multiTermParsing(self, termList, **kwargs):
         """ 병렬처리 """
