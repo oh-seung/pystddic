@@ -630,7 +630,8 @@ class domainManage(domainGroupManage):
         self.domainColumns = ['domainName', 'domainDescription', 'domainDataType', 'domainLength', 'domainScale', 'domainGroupName', 'minValue', 'maxValue', 'validValue', 'default']
         self.domainKoreanMapping = {}
 
-        self.domainDataTypeList = ['varchar', 'char', 'int', 'float', 'clob', 'blob', 'nvarchar', 'nchar', 'date', 'datetime', 'timestamp', 'datestr']
+        self.domainDataTypes = ['varchar', 'char', 'int', 'float', 'clob', 'blob', 'nvarchar', 'nchar', 'date', 'datetime', 'timestamp', 'datestr']
+        self.stringDataTypes = ['varchar', 'char', 'nvarchar', 'nchar', 'datestr']
 
         self._domainGroupStorageEmpty()
         self._domainStorageEmpty()
@@ -641,6 +642,7 @@ class domainManage(domainGroupManage):
 
     def domainInsert(self, domainName:str, domainDescription:str, domainDataType:str, domainGroupName:str, **kwargs):
         """ 도메인 등록 """
+
         tempDomainSet = {'domainName':domainName,
             'domainDescription':domainDescription,
             'domainDataType':domainDataType,
@@ -653,7 +655,6 @@ class domainManage(domainGroupManage):
             'default':None,
         }
         
-        #tempDomainSet[''] = kwargs[''] if '' in kwargs.keys() else ''
         tempDomainSet['domainLength'] = kwargs['domainLength'] if 'domainLength' in kwargs.keys() else ''
         tempDomainSet['domainScale'] = kwargs['domainScale'] if 'domainScale' in kwargs.keys() else ''
         tempDomainSet['minValue'] = kwargs['minValue'] if 'minValue' in kwargs.keys() else ''
@@ -683,10 +684,57 @@ class domainManage(domainGroupManage):
     def _domainValidationCheck(self, domainSet:dict):
         """ 도메인이 맞는지 검증 """
         checkResult = {}
+        domainGroupStorage = self.domainGroupStorage
 
-        ### 소수점 길이 체크
-        if type(domainSet['domainLength']).__name__ == 'int' and type(domainSet['domainScale']).__name__ == 'int':
-            checkResult['소수점길이, 데이터길이 초과'] = domainSet['domainLength'] > 0 and domainSet['domainScale'] > 0 and domainSet['domainScale'] >= domainSet['domainLength']
+        ### 1) 실수형 검증
+        ### 1-1) 데이터길이 보다 소수점이 작어야 한다.
+        ### 1-3) 소수점을 반드시 지정해야 한다.
+        if domainSet['domainDataType'] == 'float':
+            if type(domainSet['domainScale']).__name__ == 'int':
+                checkResult['소수점길이, 데이터길이 초과'] = domainSet['domainLength'] > 0 and domainSet['domainScale'] > 0 and domainSet['domainScale'] >= domainSet['domainLength']
+            else:
+                checkResult['소수점형식(float) 사용시 소수점 길이 지정 필요'] = True
+
+        ### ?) 정수형과 문자형에 대한 소수점 검증
+        if domainSet['domainDataType'] == 'int' or domainSet['domainDataType'] in self.stringDataTypes:
+            checkResult['소수점 존재(Scale 삭제 필요)'] = type(domainSet['domainScale']).__name__ == 'int'
+
+        ### 2) 데이터타입은 domainDataTypes 에 존재해야 함
+        checkResult['미지정데이터타입'] = domainSet['domainDataType'] not in self.domainDataTypes
+
+        ### 3) 문자형을 사용할 경우, 길이를 필수로 지정해야 함(max 사용가능)
+        if domainSet['domainDataType'] in self.stringDataTypes:
+            if type(domainSet['domainLength']).__name__ == 'str':
+                checkResult['길이 지정 필요'] = domainSet['domainLength'] != 'MAX'
+            elif type(domainSet['domainLength']).__name__ == 'int':
+                checkResult['길이 지정 필요'] = domainSet['domainLength'] < 1
+
+        ### 4) 도메인그룹 존재여부 확인
+        checkResult['도메인 그룹 미존재'] = domainSet['domainGroupName'] not in domainGroupStorage['domainGroupName'].values
+
+        ### 5) 속성 분류어 확인
+        ### 5-1) 도메인그룹이 '제한'일 경우, 분류어 '='(Equal)로 검증
+        ### 5-2) 도메인그룹이 '번호'일 경우, 분류어 endwith 로 검증
+        ### 5-3) 도메인그룹이 '번호'일 경우, 분류어와 동일하게 도메인명 생성 불가 검증
+        attributeClassWords = domainGroupStorage[domainGroupStorage['domainGroupName'] == domainSet['domainGroupName']].domainAttributeClassWord.values[0]
+        domainGroupUniqueness = domainGroupStorage[domainGroupStorage['domainGroupName'] == domainSet['domainGroupName']].domainGroupUniqueness.values[0]
+        if domainGroupUniqueness == '제한':
+            checkResult['속성분류어 범위 미준수'] = domainSet['domainName'] not in attributeClassWords
+        elif domainGroupUniqueness == '번호':
+            checkResult['속성분류어 범위 미준수'] = True
+            for attributeClassWord in attributeClassWords:
+                checkResult['속성분류어 범위 미준수'] = False if domainSet['domainName'].endswith(attributeClassWord) else checkResult['속성분류어 범위 미준수']
+                checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가'] = False if domainSet['domainName'] == attributeClassWord else checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가']
+
+        ### 6) 길이지정 불가유형에 대해 검증
+        if domainSet['domainDataType'] in ['clob', 'blob', 'date', 'datetime']:
+            checkResult['데이터 길이 지정 불가'] = type(domainSet['domainLength']).__name__ == 'int'
+            if type(domainSet['domainLength']).__name__ == 'str':
+                checkResult['데이터 길이 사용 불가'] = domainSet['domainLength'] != ''
+
+            checkResult['소수점 지정 불가'] = type(domainSet['domainScale']).__name__ == 'int'
+            if type(domainSet['domainScale']).__name__ == 'str':
+                checkResult['소수점 길이 사용 불가'] = domainSet['domainScale'] != ''                
 
         return checkResult
 
