@@ -685,6 +685,7 @@ class domainManage(domainGroupManage):
         """ 도메인이 맞는지 검증 """
         checkResult = {}
         domainGroupStorage = self.domainGroupStorage
+        domainStorage = self.domainStorage
 
         ### 1) 실수형 검증
         ### 1-1) 데이터길이 보다 소수점이 작어야 한다.
@@ -722,9 +723,21 @@ class domainManage(domainGroupManage):
             checkResult['속성분류어 범위 미준수'] = domainSet['domainName'] not in attributeClassWords
         elif domainGroupUniqueness == '번호':
             checkResult['속성분류어 범위 미준수'] = True
+            checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가'] = False
             for attributeClassWord in attributeClassWords:
                 checkResult['속성분류어 범위 미준수'] = False if domainSet['domainName'].endswith(attributeClassWord) else checkResult['속성분류어 범위 미준수']
-                checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가'] = False if domainSet['domainName'] == attributeClassWord else checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가']
+                checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가'] = True if domainSet['domainName'] == attributeClassWord else checkResult['번호도메인그룹은 분류어와 동일한 명칭으로 도메인 생성 불가']
+
+        ### ?) 도메인 유일성 검증
+        ### ?-1) 제한도메인의 경우, 도메인명 + 데이터타입 + 데이터길이 + 소수점으로 유일해야 한다.
+        ### ?-2) 번호도메인의 경우, 도메인명으로 유일해야 한다.
+        if domainGroupUniqueness == '제한':
+            existdomainkeys = domainStorage['domainName'] + domainStorage['domainDataType'] + domainStorage['domainLength'].astype('str') + ',' + domainStorage['domainScale'].astype('str')
+            newdomainkey = domainSet['domainName'] + domainSet['domainDataType'] + str(domainSet['domainLength']) + ',' + str(domainSet['domainScale'])
+            checkResult['도메인 중복(제한)'] = newdomainkey in existdomainkeys.values
+        elif domainGroupUniqueness == '번호':
+            checkResult['도메인 중복(번호)'] = domainSet['domainName'] in domainStorage['domainName'].values
+
 
         ### 6) 길이지정 불가유형에 대해 검증
         if domainSet['domainDataType'] in ['clob', 'blob', 'date', 'datetime']:
