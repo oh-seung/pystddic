@@ -45,6 +45,7 @@ class wordManage:
         """ 단어저장소를 생성 또는 비우는 메소드 """
         self.wordStorage = pd.DataFrame(None, columns=self.englishColumns)
 
+
     def multiWordInsert(self, records, **kwargs):        
         if 'progress' in kwargs.keys():
             records = tqdm(records) if kwargs['progress'] else records
@@ -55,22 +56,27 @@ class wordManage:
         #### DB와 실시간 연동시 필요하다, MultiCurrenty 환경을 너무 고민하지 말자. 그건 DB 버전으로 할 경우에 사용
         #### multiInsert에 대해 type? 을 정의하여 replace(전체변경), merge(데이터병합) 의 유형으로 생성함
         #### replace : 데이터를 전체 삭제하고 새로 반영
-        #### merge : 중복되는 데이터를 변경함, 단 삭제되지 않음
+        
+        allReplace = False
         if 'replace' in kwargs.keys():
-            if kwargs['replace']:
-                self._wordStorageEmpty()
-
-        for row in records:
-            synonymousWord = row['synonymousWord'] if 'synonymousWord' in row.keys() else ""
-            try:
-                self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
-                                LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
-                                EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
-                                wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord)
-            except:
-                _, message, _ = sys.exc_info()
-                error_words.append([message, row])
+            allReplace = True if kwargs['replace'] else allReplace
                 
+        
+        if allReplace:
+
+
+        else:
+            for row in records:
+                synonymousWord = row['synonymousWord'] if 'synonymousWord' in row.keys() else ""
+                try:
+                    self.wordInsert(LogicalWord=row['LogicalWord'], PhysicalWord=row['PhysicalWord'], \
+                                    LogicalDescription=row['LogicalDescription'], PhysicalDescription=row['PhysicalDescription'], \
+                                    EntityClassWord=row['EntityClassWord'], AttributeClassWord=row['AttributeClassWord'], \
+                                    wordStandardType=row['wordStandardType'], synonymousWord=synonymousWord, allReplace=allReplace)
+                except:
+                    _, message, _ = sys.exc_info()
+                    error_words.append([message, row])
+
         return None if len(error_words) == 0 else error_words
                 
             
@@ -86,7 +92,7 @@ class wordManage:
              - wordStandardType : 표준단어, 동의어, 금칙어를 지정함
              - synonymousWord : 동의어 단어에 지정된 단어를 매핑
         """
-        
+
         ### 동의어가 있다면 동의어 기록, 없으면 None
         synonymousWord = kwargs['synonymousWord'] if 'synonymousWord' in kwargs.keys() else ""
         ### 단어 셋을 지정
@@ -737,7 +743,6 @@ class domainManage(domainGroupManage):
             checkResult['도메인 중복(제한)'] = newdomainkey in existdomainkeys.values
         elif domainGroupUniqueness == '번호':
             checkResult['도메인 중복(번호)'] = domainSet['domainName'] in domainStorage['domainName'].values
-
 
         ### 6) 길이지정 불가유형에 대해 검증
         if domainSet['domainDataType'] in ['clob', 'blob', 'date', 'datetime']:
